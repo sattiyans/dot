@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Send, ArrowUp, Mail } from 'lucide-react';
+import { Send, Mail } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/toast';
 
@@ -13,7 +13,8 @@ interface Message {
 }
 
 export default function ChatbotWidget() {
-  const [user, setUser] = useState<any>(null);
+  // If you have a User type from Supabase, use it. Otherwise, use unknown or a minimal type.
+  const [user, setUser] = useState<null | { id: string; email: string }>(null);
   const { showToast } = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -21,7 +22,6 @@ export default function ChatbotWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isEmailMode, setIsEmailMode] = useState(false);
-  const [isOTPMode, setIsOTPMode] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
   const [isPasswordMode, setIsPasswordMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -54,7 +54,7 @@ export default function ChatbotWidget() {
 
   // On mount, get user
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ? { id: data.user.id, email: data.user.email } : null));
   }, []);
 
   const handleSendMessage = async () => {
@@ -188,7 +188,6 @@ export default function ChatbotWidget() {
     setIsExpanded(false);
     setInputValue('');
     setIsEmailMode(false);
-    setIsOTPMode(false);
     setPendingEmail('');
   };
 

@@ -4,8 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { supabase } from '@/lib/supabase';
 
-// TODO: Define Site type locally or use 'any' for now
-type Site = any;
+interface Site {
+  id: string;
+  name: string;
+  domain: string;
+  [key: string]: any;
+}
 
 export function useSites() {
   const [sites, setSites] = useState<Site[]>([])
@@ -31,7 +35,7 @@ export function useSites() {
   }, [showToast]);
 
   // Create a new site
-  const createSite = useCallback(async (siteData: any) => {
+  const createSite = useCallback(async (siteData: Partial<Site>) => {
     try {
       const { data, error } = await supabase.from('sites').insert([siteData]).select().single();
       if (error) throw error;
@@ -46,7 +50,7 @@ export function useSites() {
   }, [showToast]);
 
   // Update a site
-  const updateSite = useCallback(async (id: string, updates: any) => {
+  const updateSite = useCallback(async (id: string, updates: Partial<Site>) => {
     try {
       const { data, error } = await supabase.from('sites').update(updates).eq('id', id).select().single();
       if (error) throw error;
