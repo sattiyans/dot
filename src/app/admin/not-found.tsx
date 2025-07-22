@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Home, ArrowLeft, LayoutDashboard } from 'lucide-react';
+import { Home, LayoutDashboard } from 'lucide-react';
 
 export default function AdminNotFound() {
   return (
@@ -15,8 +15,8 @@ export default function AdminNotFound() {
         {/* Error Message */}
         <h2 className="text-2xl font-bold text-white mb-4">Admin Page Not Found</h2>
         <p className="text-white/60 mb-8 leading-relaxed">
-          The admin page you're looking for doesn't exist. 
-          Let's get you back to the dashboard.
+          The page you&apos;re looking for doesn&apos;t exist or has been moved. 
+          Let&apos;s get you back on track.
         </p>
 
         {/* Action Buttons */}

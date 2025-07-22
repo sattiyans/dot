@@ -4,11 +4,18 @@ import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { supabase } from '@/lib/supabase';
 
-interface Site {
+export interface Site {
   id: string;
   name: string;
   domain: string;
-  // Add more fields as needed, but avoid 'any'.
+  total_chats: number;
+  accuracy: number;
+  status: string;
+  setup_status: string;
+  ai_model: string;
+  response_time: string;
+  last_seen: string;
+  last_activity: string;
 }
 
 export function useSites() {

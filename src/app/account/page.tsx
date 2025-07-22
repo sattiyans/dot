@@ -9,11 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { 
   User, 
-  Mail, 
   Building, 
-  Globe, 
-  Phone, 
-  MapPin, 
   Save, 
   CheckCircle, 
   AlertCircle,
@@ -23,24 +19,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  company: string;
-  website: string;
-  phone: string;
-  location: string;
-  bio: string;
-  isOnboarded: boolean;
-  createdAt: string;
-  lastLogin: string;
-}
-
 export default function AccountPage() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [profile, setProfile] = useState<{ id: string; email: string; firstName: string; lastName: string; company: string; website: string; phone: string; location: string; bio: string; isOnboarded: boolean; createdAt: string; lastLogin: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
@@ -60,12 +41,12 @@ export default function AccountPage() {
     const fetchProfile = async () => {
       setIsLoading(true);
       const { data: userData } = await supabase.auth.getUser();
-      setUser(userData.user);
+      setUser(userData.user ? { id: userData.user.id, email: userData.user.email ?? '' } : null);
       if (!userData.user) {
         setIsLoading(false);
         return;
       }
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userData.user.id).single();
+      const { data } = await supabase.from('profiles').select('*').eq('id', userData.user.id).single();
       if (data) {
         setProfile(data);
         setFormData({
@@ -99,13 +80,11 @@ export default function AccountPage() {
       isOnboarded: true,
       id: user.id
     };
-    const { error } = await supabase.from('profiles').upsert(updates);
-    if (!error) {
-      setProfile((prev: any) => ({ ...prev, ...updates }));
-      setIsOnboarding(false);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
-    }
+    await supabase.from('profiles').upsert(updates);
+    setProfile(prev => prev ? { ...prev, ...updates } : null);
+    setIsOnboarding(false);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
     setIsSaving(false);
   };
 

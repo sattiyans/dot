@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSites } from '@/hooks/useSites';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,17 +10,18 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Globe, MessageCircle, Users, TrendingUp, ArrowRight, X, Copy, Check, Eye, Settings, Sparkles, Code, Activity, Zap, Brain, Target, BarChart3, Clock, Star, Info, Palette, Loader2 } from 'lucide-react';
+import { Plus, Globe, MessageCircle, Users, Code, Activity, Zap, Brain, Info, Palette, Settings, Sparkles, X, Check, Copy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import type { Site } from '@/hooks/useSites';
 
 export default function AdminDashboard() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const { sites, createSite, updateSite, deleteSite } = useSites();
+  const { sites, createSite } = useSites();
   const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [selectedSite, setSelectedSite] = useState<any>(null);
+  const [selectedSite, setSelectedSite] = useState<Site | null>(null);
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ name: '', domain: '' });
@@ -31,7 +31,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+      setUser(data.user ? { id: data.user.id, email: data.user.email ?? '' } : null);
       setLoading(false);
     });
   }, []);
@@ -97,7 +97,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const openSettingsModal = (site: any) => {
+  const openSettingsModal = (site: Site) => {
     setSelectedSite(site);
     setIsSettingsModalOpen(true);
   };
@@ -507,28 +507,28 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
                 <div className="flex items-center space-x-3">
                   <div className={`w-3 h-3 rounded-full ${
-                    selectedSite.setupStatus === 'connected' ? 'bg-white animate-pulse' : 
-                    selectedSite.setupStatus === 'not_connected' ? 'bg-white/60' : 
+                    selectedSite.setup_status === 'connected' ? 'bg-white animate-pulse' : 
+                    selectedSite.setup_status === 'not_connected' ? 'bg-white/60' : 
                     'bg-white/40'
                   }`}></div>
                   <div>
                     <p className="text-sm font-medium text-white">
-                      {selectedSite.setupStatus === 'connected' ? 'Dot is connected and active' : 
-                       selectedSite.setupStatus === 'not_connected' ? 'Dot is not set up on your website' : 
+                      {selectedSite.setup_status === 'connected' ? 'Dot is connected and active' : 
+                       selectedSite.setup_status === 'not_connected' ? 'Dot is not set up on your website' : 
                        'Connection error detected'}
                     </p>
                     <p className="text-xs text-white/60">
-                      Last seen: {selectedSite.lastSeen}
+                      Last seen: {selectedSite.last_seen}
                     </p>
                   </div>
                 </div>
                 <Badge variant="outline" className={`text-xs ${
-                  selectedSite.setupStatus === 'connected' ? 'border-white/30 text-white' : 
-                  selectedSite.setupStatus === 'not_connected' ? 'border-white/20 text-white/60' : 
+                  selectedSite.setup_status === 'connected' ? 'border-white/30 text-white' : 
+                  selectedSite.setup_status === 'not_connected' ? 'border-white/20 text-white/60' : 
                   'border-white/10 text-white/40'
                 }`}>
-                  {selectedSite.setupStatus === 'connected' ? 'Connected' : 
-                   selectedSite.setupStatus === 'not_connected' ? 'Not Setup' : 
+                  {selectedSite.setup_status === 'connected' ? 'Connected' : 
+                   selectedSite.setup_status === 'not_connected' ? 'Not Setup' : 
                    'Error'}
                 </Badge>
               </div>
@@ -718,7 +718,7 @@ export default function AdminDashboard() {
                 </h3>
                 
                 <div className="form-group">
-                  <Label className="form-label">Copy this code and paste it into your website's HTML</Label>
+                  <Label className="form-label">Copy this code and paste it into your website&apos;s HTML</Label>
                   <div className="relative">
                     <Textarea
                       value={`<script src="https://cdn.d0t.my/dot.js" defer></script>
@@ -727,7 +727,7 @@ export default function AdminDashboard() {
     siteId: '${selectedSite?.id}',
     position: 'bottom-center',
     theme: 'dark',
-    welcomeMessage: "Hi! I'm your Dot assistant. Ask me anything about our company, products, or services.",
+    welcomeMessage: 'Hi! I&apos;m your Dot assistant. Ask me anything about our company, products, or services.',
     size: 'medium'
   };
 </script>`}
@@ -752,7 +752,7 @@ export default function AdminDashboard() {
                   </h4>
                   <ol className="text-white/60 text-sm space-y-1 list-decimal list-inside">
                     <li>Copy the embed code above</li>
-                    <li>Paste it into your website's HTML, preferably before the closing &lt;/body&gt; tag</li>
+                    <li>Paste it into your website&apos;s HTML, preferably before the closing &lt;/body&gt; tag</li>
                     <li>Save and publish your website</li>
                     <li>Your Dot will appear in the configured position</li>
                   </ol>

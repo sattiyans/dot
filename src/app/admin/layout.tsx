@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { LayoutDashboard, LogOut, Menu, X, User } from 'lucide-react';
 import { useState } from 'react';
 // REMOVE: import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
