@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, MessageSquare, Edit, Trash2, Save, X } from 'lucide-react';
+import { Plus, MessageSquare, Edit, Trash2, Save } from 'lucide-react';
 
 export default function FAQPage() {
   // Mock FAQ data - replace with real data

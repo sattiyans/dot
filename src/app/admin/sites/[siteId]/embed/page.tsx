@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Check, Code, Eye, Settings } from 'lucide-react';
+import { Copy, Code, Eye, Settings } from 'lucide-react';
 import ChatbotWidget from '@/components/ChatbotWidget';
 
 export default function EmbedPage() {
@@ -123,7 +123,7 @@ export default function EmbedPage() {
               </li>
               <li className="flex items-start">
                 <span className="bg-white text-black rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mr-3 mt-0.5">2</span>
-                <span>Paste it into your website's HTML</span>
+                <span>Paste it into your website&apos;s HTML</span>
               </li>
               <li className="flex items-start">
                 <span className="bg-white text-black rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mr-3 mt-0.5">3</span>
