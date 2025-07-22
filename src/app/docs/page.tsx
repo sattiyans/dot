@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Code, BookOpen, MessageSquare, Settings, Zap } from 'lucide-react';
 
 export default function DocsPage() {
@@ -93,7 +92,7 @@ export default function DocsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-400 mb-4">Customize your chatbot's appearance and behavior</p>
+              <p className="text-gray-400 mb-4">Customize your chatbot&apos;s appearance and behavior</p>
               <ul className="space-y-2 text-sm text-gray-300">
                 <li>• Theme and styling options</li>
                 <li>• Welcome message setup</li>
@@ -206,7 +205,7 @@ export default function DocsPage() {
           <CardHeader>
             <CardTitle className="text-xl">Need Help?</CardTitle>
             <CardDescription className="text-gray-400">
-              Can't find what you're looking for? We're here to help
+              Can&apos;t find what you&apos;re looking for? We&apos;re here to help
             </CardDescription>
           </CardHeader>
           <CardContent>

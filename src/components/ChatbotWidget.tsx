@@ -121,7 +121,7 @@ export default function ChatbotWidget() {
     const password = inputValue.trim();
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: pendingEmail, password });
+      const { error } = await supabase.auth.signInWithPassword({ email: pendingEmail, password });
       if (error) {
         const aiMessage = {
           id: (Date.now() + 6).toString(),

@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, AlertCircle, Edit, Save, RefreshCw } from 'lucide-react';
+import { CheckCircle, Edit, Save, RefreshCw } from 'lucide-react';
 
 export default function ScrapePage() {
   // Mock scraped content - replace with real data
