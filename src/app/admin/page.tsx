@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useUser } from '@supabase/auth-helpers-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useSites } from '@/hooks/useSites';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,27 +14,11 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, Globe, MessageCircle, Users, TrendingUp, ArrowRight, X, Copy, Check, Eye, Settings, Sparkles, Code, Activity, Zap, Brain, Target, BarChart3, Clock, Star, Info, Palette, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { useSites } from '@/hooks/useSites';
 
 export default function AdminDashboard() {
-  const user = useUser();
-  const router = useRouter();
-
-  React.useEffect(() => {
-    if (user === undefined) return; // still loading
-    if (!user) {
-      router.replace('/');
-    }
-  }, [user, router]);
-
-  if (user === undefined) {
-    return <div className="flex items-center justify-center min-h-screen text-white">Loading...</div>;
-  }
-  if (!user) {
-    return <div className="flex items-center justify-center min-h-screen text-white">Redirecting...</div>;
-  }
-
-  const { sites, loading, createSite, updateSite, deleteSite } = useSites();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { sites, createSite, updateSite, deleteSite } = useSites();
   const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedSite, setSelectedSite] = useState<any>(null);
@@ -41,10 +26,34 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ name: '', domain: '' });
   const { showToast } = useToast();
-  
-  // Focus management refs
-  const addSiteModalRef = React.useRef<HTMLDivElement>(null);
-  const settingsModalRef = React.useRef<HTMLDivElement>(null);
+  const addSiteModalRef = useRef<HTMLDivElement>(null);
+  const settingsModalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isAddSiteModalOpen && addSiteModalRef.current) {
+      addSiteModalRef.current.focus();
+    }
+  }, [isAddSiteModalOpen]);
+
+  useEffect(() => {
+    if (isSettingsModalOpen && settingsModalRef.current) {
+      settingsModalRef.current.focus();
+    }
+  }, [isSettingsModalOpen]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen text-white">Loading...</div>;
+  }
+  if (!user) {
+    return <div className="flex items-center justify-center min-h-screen text-white">Please log in to access the admin dashboard.</div>;
+  }
 
   const stats = [
     { title: 'Total Sites', value: sites.length.toString(), icon: Globe, trend: '+12%', trendUp: true },
@@ -134,19 +143,6 @@ export default function AdminDashboard() {
       setIsLoading(false);
     }
   };
-
-  // Focus management
-  React.useEffect(() => {
-    if (isAddSiteModalOpen && addSiteModalRef.current) {
-      addSiteModalRef.current.focus();
-    }
-  }, [isAddSiteModalOpen]);
-
-  React.useEffect(() => {
-    if (isSettingsModalOpen && settingsModalRef.current) {
-      settingsModalRef.current.focus();
-    }
-  }, [isSettingsModalOpen]);
 
   return (
     <div className="relative z-10 p-4 lg:p-8 max-w-7xl mx-auto">
@@ -275,7 +271,7 @@ export default function AdminDashboard() {
           </h2>
         </div>
         
-        {loading ? (
+        {isLoading ? (
           <div className="grid gap-4">
             {Array.from({ length: 2 }).map((_, index) => (
               <Card key={index} className="bg-white/5 backdrop-blur-sm border border-white/10">

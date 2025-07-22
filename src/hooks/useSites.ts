@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Tables, Inserts, Updates } from '@/lib/supabase'
 import { useToast } from '@/components/ui/toast'
+import { supabase } from '@/lib/supabase';
 
-type Site = Tables<'sites'>
+// TODO: Define Site type locally or use 'any' for now
+type Site = any;
 
 export function useSites() {
   const [sites, setSites] = useState<Site[]>([])
@@ -15,121 +16,76 @@ export function useSites() {
   // Fetch all sites
   const fetchSites = useCallback(async () => {
     try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await fetch('/api/sites')
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch sites')
-      }
-      
-      setSites(data.sites || [])
+      setLoading(true);
+      setError(null);
+      const { data, error } = await supabase.from('sites').select('*');
+      if (error) throw error;
+      setSites(data || []);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch sites'
-      setError(errorMessage)
-      showToast(errorMessage, 'error')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch sites';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [showToast])
+  }, [showToast]);
 
   // Create a new site
-  const createSite = useCallback(async (siteData: Omit<Inserts<'sites'>, 'user_id'>) => {
+  const createSite = useCallback(async (siteData: any) => {
     try {
-      const response = await fetch('/api/sites', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(siteData),
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create site')
-      }
-      
-      setSites(prev => [data.site, ...prev])
-      showToast('Site created successfully!', 'success')
-      return data.site
+      const { data, error } = await supabase.from('sites').insert([siteData]).select().single();
+      if (error) throw error;
+      setSites(prev => [data, ...prev]);
+      showToast('Site created successfully!', 'success');
+      return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create site'
-      showToast(errorMessage, 'error')
-      throw err
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create site';
+      showToast(errorMessage, 'error');
+      throw err;
     }
-  }, [showToast])
+  }, [showToast]);
 
   // Update a site
-  const updateSite = useCallback(async (id: string, updates: Partial<Updates<'sites'>>) => {
+  const updateSite = useCallback(async (id: string, updates: any) => {
     try {
-      const response = await fetch(`/api/sites/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update site')
-      }
-      
-      setSites(prev => prev.map(site => 
-        site.id === id ? { ...site, ...data.site } : site
-      ))
-      showToast('Site updated successfully!', 'success')
-      return data.site
+      const { data, error } = await supabase.from('sites').update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      setSites(prev => prev.map(site => site.id === id ? { ...site, ...data } : site));
+      showToast('Site updated successfully!', 'success');
+      return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update site'
-      showToast(errorMessage, 'error')
-      throw err
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update site';
+      showToast(errorMessage, 'error');
+      throw err;
     }
-  }, [showToast])
+  }, [showToast]);
 
   // Delete a site
   const deleteSite = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`/api/sites/${id}`, {
-        method: 'DELETE',
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete site')
-      }
-      
-      setSites(prev => prev.filter(site => site.id !== id))
-      showToast('Site deleted successfully!', 'success')
+      const { error } = await supabase.from('sites').delete().eq('id', id);
+      if (error) throw error;
+      setSites(prev => prev.filter(site => site.id !== id));
+      showToast('Site deleted successfully!', 'success');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete site'
-      showToast(errorMessage, 'error')
-      throw err
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete site';
+      showToast(errorMessage, 'error');
+      throw err;
     }
-  }, [showToast])
+  }, [showToast]);
 
   // Get a specific site
   const getSite = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`/api/sites/${id}`)
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch site')
-      }
-      
-      return data.site
+      const { data, error } = await supabase.from('sites').select('*').eq('id', id).single();
+      if (error) throw error;
+      return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch site'
-      showToast(errorMessage, 'error')
-      throw err
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch site';
+      showToast(errorMessage, 'error');
+      throw err;
     }
-  }, [showToast])
+  }, [showToast]);
 
   // Fetch sites on mount
   useEffect(() => {

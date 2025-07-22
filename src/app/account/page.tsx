@@ -21,6 +21,7 @@ import {
   Brain,
   Settings
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface UserProfile {
   id: string;
@@ -38,7 +39,8 @@ interface UserProfile {
 }
 
 export default function AccountPage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
@@ -53,36 +55,33 @@ export default function AccountPage() {
     bio: ''
   });
 
-  // Simulate fetching user profile
+  // Fetch user and profile from Supabase
   useEffect(() => {
-    // Mock data - in real app, this would come from API
-    const mockProfile: UserProfile = {
-      id: '1',
-      email: 'user@example.com',
-      firstName: '',
-      lastName: '',
-      company: '',
-      website: '',
-      phone: '',
-      location: '',
-      bio: '',
-      isOnboarded: false,
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      setUser(userData.user);
+      if (!userData.user) {
+        setIsLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userData.user.id).single();
+      if (data) {
+        setProfile(data);
+        setFormData({
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          company: data.company || '',
+          website: data.website || '',
+          phone: data.phone || '',
+          location: data.location || '',
+          bio: data.bio || ''
+        });
+        setIsOnboarding(!data.isOnboarded);
+      }
+      setIsLoading(false);
     };
-
-    setProfile(mockProfile);
-    setFormData({
-      firstName: mockProfile.firstName,
-      lastName: mockProfile.lastName,
-      company: mockProfile.company,
-      website: mockProfile.website,
-      phone: mockProfile.phone,
-      location: mockProfile.location,
-      bio: mockProfile.bio
-    });
-    setIsOnboarding(!mockProfile.isOnboarded);
-    setIsLoading(false);
+    fetchProfile();
   }, []);
 
   const handleInputChange = (field: string, value: string) => {
@@ -94,53 +93,30 @@ export default function AccountPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Update profile
-    if (profile) {
-      setProfile({
-        ...profile,
-        ...formData,
-        isOnboarded: true
-      });
+    if (!user) return;
+    const updates = {
+      ...formData,
+      isOnboarded: true,
+      id: user.id
+    };
+    const { error } = await supabase.from('profiles').upsert(updates);
+    if (!error) {
+      setProfile((prev: any) => ({ ...prev, ...updates }));
+      setIsOnboarding(false);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
     }
-    
-    setIsOnboarding(false);
     setIsSaving(false);
-    setShowSuccess(true);
-    
-    // Hide success message after 3 seconds
-    setTimeout(() => setShowSuccess(false), 3000);
   };
 
   const isFormValid = formData.firstName.trim() && formData.lastName.trim() && formData.company.trim();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black text-white p-4 lg:p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="animate-pulse">
-            <div className="h-8 bg-white/10 rounded w-1/3 mb-8"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-4">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-16 bg-white/5 rounded"></div>
-                ))}
-              </div>
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-24 bg-white/5 rounded"></div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen text-white">Loading...</div>;
   }
-
+  if (!user) {
+    return <div className="flex items-center justify-center min-h-screen text-white">Please log in to access your account.</div>;
+  }
   return (
     <div className="relative z-10 p-4 lg:p-8 max-w-4xl mx-auto">
         {/* Enhanced Header Section */}

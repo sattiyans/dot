@@ -3,14 +3,21 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { LayoutDashboard, LogOut, Menu, X, User } from 'lucide-react';
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+// REMOVE: import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-  const { signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+
+  const handleSignOut = async () => {
+    // Use SPA supabase client for sign out
+    const { supabase } = await import('@/lib/supabase');
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -26,7 +33,6 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                 <div className="absolute inset-0 rounded-full bg-white animate-ping opacity-20"></div>
                 <div className="absolute inset-1 rounded-full bg-white animate-ping opacity-30" style={{ animationDelay: '0.5s' }}></div>
                 <div className="absolute inset-2 rounded-full bg-white animate-ping opacity-40" style={{ animationDelay: '1s' }}></div>
-                
                 {/* Main Circle */}
                 <div className="relative w-5 h-5 bg-white rounded-full shadow-inner"></div>
               </div>
@@ -44,12 +50,14 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                 Dashboard
               </Button>
             </Link>
-            <Button variant="ghost" className={`${pathname === '/account' ? 'text-white bg-white/10 border-white/20' : 'text-white/60 hover:text-white hover:bg-white/10 border-transparent hover:border-white/20'} border transition-all duration-200`}>
-              <User className="mr-2 h-4 w-4" />
-              Account
-            </Button>
+            <Link href="/account">
+              <Button variant="ghost" className={`${pathname === '/account' ? 'text-white bg-white/10 border-white/20' : 'text-white/60 hover:text-white hover:bg-white/10 border-transparent hover:border-white/20'} border transition-all duration-200`}>
+                <User className="mr-2 h-4 w-4" />
+                Account
+              </Button>
+            </Link>
             <Button 
-              onClick={signOut}
+              onClick={handleSignOut}
               variant="ghost" 
               className="text-white/60 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20"
             >
@@ -81,13 +89,15 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                   Dashboard
                 </Button>
               </Link>
-              <Button variant="ghost" className={`w-full justify-start ${pathname === '/account' ? 'text-white bg-white/10 border-white/20' : 'text-white/60 hover:text-white hover:bg-white/10 border-transparent hover:border-white/20'} border transition-all duration-200`}>
-                <User className="mr-3 h-4 w-4" />
-                Account
-              </Button>
+              <Link href="/account" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className={`w-full justify-start ${pathname === '/account' ? 'text-white bg-white/10 border-white/20' : 'text-white/60 hover:text-white hover:bg-white/10 border-transparent hover:border-white/20'} border transition-all duration-200`}>
+                  <User className="mr-3 h-4 w-4" />
+                  Account
+                </Button>
+              </Link>
               <Button 
                 onClick={() => {
-                  signOut();
+                  handleSignOut();
                   setIsMobileMenuOpen(false);
                 }}
                 variant="ghost" 

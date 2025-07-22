@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Send, ArrowUp, Mail } from 'lucide-react';
-import { useUser } from '@supabase/auth-helpers-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/toast';
 
@@ -14,7 +13,7 @@ interface Message {
 }
 
 export default function ChatbotWidget() {
-  const user = useUser();
+  const [user, setUser] = useState<any>(null);
   const { showToast } = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -52,6 +51,11 @@ export default function ChatbotWidget() {
       }, 100);
     }
   }, [isExpanded, messages.length]);
+
+  // On mount, get user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+  }, []);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -123,67 +127,23 @@ export default function ChatbotWidget() {
     const password = inputValue.trim();
     setIsLoading(true);
     try {
-      let { error } = await supabase.auth.signInWithPassword({ email: pendingEmail, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: pendingEmail, password });
       if (error) {
-        console.log('SignIn error:', error);
-        if (error.message && error.message.toLowerCase().includes('invalid login credentials')) {
-          const aiMessage: Message = {
-            id: (Date.now() + 2).toString(),
-            text: "No account found. Creating a new account for you...",
-            isUser: false,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, aiMessage]);
-          const { error: signUpError } = await supabase.auth.signUp({ email: pendingEmail, password });
-          if (signUpError) {
-            console.log('SignUp error:', signUpError);
-            const aiMessage2: Message = {
-              id: (Date.now() + 3).toString(),
-              text: `Failed to register: ${signUpError.message}`,
-              isUser: false,
-              timestamp: new Date()
-            };
-            setMessages(prev => [...prev, aiMessage2]);
-            showToast('Failed to register. Please try again.', 'error');
-            setIsLoading(false);
-            return;
-          }
-          ({ error } = await supabase.auth.signInWithPassword({ email: pendingEmail, password }));
-          if (error) {
-            console.log('SignIn after signUp error:', error);
-            const aiMessage3: Message = {
-              id: (Date.now() + 4).toString(),
-              text: `Failed to sign in after registration: ${error.message}`,
-              isUser: false,
-              timestamp: new Date()
-            };
-            setMessages(prev => [...prev, aiMessage3]);
-            showToast('Failed to sign in after registration. Please try again.', 'error');
-            setIsLoading(false);
-            return;
-          }
-          const aiMessage4: Message = {
-            id: (Date.now() + 5).toString(),
-            text: "Account created and signed in successfully!",
-            isUser: false,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, aiMessage4]);
-        } else {
-          const aiMessage = {
-            id: (Date.now() + 6).toString(),
-            text: `Failed to sign in: ${error.message}`,
-            isUser: false,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, aiMessage]);
-          showToast('Failed to sign in. Please try again.', 'error');
-          setIsLoading(false);
-          return;
-        }
+        const aiMessage = {
+          id: (Date.now() + 6).toString(),
+          text: `Failed to sign in: ${error.message}`,
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        showToast('Failed to sign in. Please try again.', 'error');
+        setIsLoading(false);
+        return;
       }
+      setUser(data.user);
+      // Success: continue as before
       // Add user message (mask password)
-      const userMessage: Message = {
+      const userMessage = {
         id: Date.now().toString(),
         text: '*'.repeat(password.length),
         isUser: true,

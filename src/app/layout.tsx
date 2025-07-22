@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from '@/components/ui/toast';
 import ChatbotWidget from '@/components/ChatbotWidget';
-import SupabaseProvider from '@/components/SupabaseProvider';
 
 export const metadata: Metadata = {
   title: "Dot",
@@ -17,12 +16,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className="dark">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SupabaseProvider>
-          <ToastProvider>
-            {children}
-            <ChatbotWidget />
-          </ToastProvider>
-        </SupabaseProvider>
+        <ToastProvider>
+          {children}
+          <ChatbotWidget />
+        </ToastProvider>
       </body>
     </html>
   );
