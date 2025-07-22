@@ -1,0 +1,5 @@
+-- Supabase schema for Dot
+-- TODO: Create users table (auto-managed by Supabase)
+-- TODO: Create sites table
+-- TODO: Create knowledge_chunks table
+-- TODO: Create chats table
