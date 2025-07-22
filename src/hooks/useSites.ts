@@ -8,7 +8,7 @@ interface Site {
   id: string;
   name: string;
   domain: string;
-  [key: string]: any;
+  // Add more fields as needed, but avoid 'any'.
 }
 
 export function useSites() {

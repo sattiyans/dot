@@ -36,7 +36,7 @@ export default function TermsPage() {
                 Agreement to Terms
               </h2>
               <p className="text-white/80 leading-relaxed">
-                By accessing and using Dot's AI chatbot service, you agree to be bound by these Terms of Service. 
+                By accessing and using Dot&apos;s AI chatbot service, you agree to be bound by these Terms of Service. 
                 If you disagree with any part of these terms, you may not access our service.
               </p>
             </section>

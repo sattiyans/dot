@@ -14,7 +14,6 @@ interface Message {
 
 export default function ChatbotWidget() {
   // If you have a User type from Supabase, use it. Otherwise, use unknown or a minimal type.
-  const [user, setUser] = useState<null | { id: string; email: string }>(null);
   const { showToast } = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,11 +50,6 @@ export default function ChatbotWidget() {
       }, 100);
     }
   }, [isExpanded, messages.length]);
-
-  // On mount, get user
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user ? { id: data.user.id, email: data.user.email } : null));
-  }, []);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -140,7 +134,6 @@ export default function ChatbotWidget() {
         setIsLoading(false);
         return;
       }
-      setUser(data.user);
       // Success: continue as before
       // Add user message (mask password)
       const userMessage = {
