@@ -1,379 +1,435 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Send, Mail } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Bot, Mail } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useToast } from '@/components/ui/toast';
+
+const hintTexts = [
+  "Ask me anything",
+  "What's on your mind?",
+  "How can I help?",
+  "Tell me about your project",
+  "Need assistance?",
+  "What would you like to know?",
+  "I'm here to help",
+  // "Let's chat about Dot",
+  // "Curious about AI chatbots?",
+  "Ready to explore?",
+  "Ask about our services",
+  // "Learn more about Dot"
+];
 
 interface Message {
   id: string;
-  text: string;
-  isUser: boolean;
+  content: string;
+  role: 'user' | 'assistant';
   timestamp: Date;
 }
 
-export default function ChatbotWidget() {
-  // If you have a User type from Supabase, use it. Otherwise, use unknown or a minimal type.
-  const { showToast } = useToast();
+interface ChatbotWidgetProps {
+  dotId: string;
+  theme?: 'dark' | 'light';
+  position?: 'bottom-right' | 'bottom-left' | 'bottom-center';
+  welcomeMessage?: string;
+  onOpen?: () => void;
+  onClose?: () => void;
+  showAuth?: boolean;
+}
+
+export default function ChatbotWidget({
+  dotId,
+  theme = 'dark',
+  position = 'bottom-center',
+  welcomeMessage = "Hi! I'm your AI assistant. How can I help you today?",
+  onOpen,
+  onClose,
+  showAuth = false
+}: ChatbotWidgetProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isEmailMode, setIsEmailMode] = useState(false);
-  const [pendingEmail, setPendingEmail] = useState('');
-  const [isPasswordMode, setIsPasswordMode] = useState(false);
+  const [authMode, setAuthMode] = useState<'none' | 'email' | 'password'>('none');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [hintIndex, setHintIndex] = useState(0);
+  const [isHintVisible, setIsHintVisible] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-
-
-  // Show suggestions when expanded and no messages
-  useEffect(() => {
-    if (isExpanded && messages.length === 0) {
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
-    }
-  }, [isExpanded, messages.length]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages, isLoading]);
 
-  // Scroll to bottom when chat expands
+  // Hint text rotation effect with smooth transitions
   useEffect(() => {
-    if (isExpanded && messages.length > 0) {
-      // Small delay to ensure the DOM is updated
+    const interval = setInterval(() => {
+      // Fade out current hint
+      setIsHintVisible(false);
+      
+      // Change text after fade out
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    }
-  }, [isExpanded, messages.length]);
+        setHintIndex((prev) => (prev + 1) % hintTexts.length);
+        setIsHintVisible(true);
+      }, 200);
+    }, 3000); // Change hint every 3 seconds
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    return () => clearInterval(interval);
+  }, [hintTexts.length]);
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputValue.trim(),
-      isUser: true,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "That's a great question! Our chatbot learns from your website content and provides intelligent responses.",
-        "Dot can be embedded on any website with just a few lines of code. It's that simple!",
-        "We use advanced AI to understand your content and answer questions accurately.",
-        "The chatbot works 24/7 and never gets tired. Perfect for customer support!",
-        "You can customize the appearance and behavior to match your brand perfectly.",
-        "Our service includes content scraping, FAQ management, and analytics.",
-        "Start with a free trial and see the difference Dot can make for your website."
-      ];
-      
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: randomResponse,
-        isUser: false,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1000);
+  const handleExpand = () => {
+    setIsExpanded(true);
+    onOpen?.();
+    setTimeout(() => inputRef.current?.focus(), 300);
   };
 
-  const handleEmailSubmit = async () => {
-    if (!inputValue.trim() || isLoading) return;
-    const email = inputValue.trim();
-    setPendingEmail(email);
-    setInputValue('');
-    setIsEmailMode(false);
-    setIsPasswordMode(true);
-    // Show the entered email as a user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: email,
-      isUser: true,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, userMessage]);
-    // Add AI message asking for password
-    const aiMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      text: "Thanks! Now please enter your password.",
-      isUser: false,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, aiMessage]);
+  const handleCollapse = () => {
+    setIsExpanded(false);
+    setAuthMode('none');
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthError('');
+    onClose?.();
   };
 
-  const handlePasswordSubmit = async () => {
-    if (!inputValue.trim() || isLoading) return;
-    const password = inputValue.trim();
+  const handleSignIn = () => {
+    setAuthMode('email');
+    setAuthError('');
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
     setIsLoading(true);
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: pendingEmail, password });
-      if (error) {
-        const aiMessage = {
-          id: (Date.now() + 6).toString(),
-          text: `Failed to sign in: ${error.message}`,
-          isUser: false,
+      if (authMode === 'email') {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(authEmail)) {
+          setAuthError('Please enter a valid email address');
+          return;
+        }
+        setAuthMode('password');
+      } else if (authMode === 'password') {
+        // Attempt login using Supabase client directly
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        });
+
+        if (error) {
+          setAuthError(error.message || 'Login failed. Please check your credentials.');
+        } else if (data.user) {
+          // Login successful, redirect to admin
+          window.location.href = '/admin';
+        }
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      setAuthError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAuthBack = () => {
+    if (authMode === 'password') {
+      setAuthMode('email');
+      setAuthPassword('');
+    } else {
+      setAuthMode('none');
+      setAuthEmail('');
+    }
+    setAuthError('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: inputValue.trim(),
+      role: 'user',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dotId,
+          message: userMessage.content,
+          history: messages.slice(-5)
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: data.response,
+          role: 'assistant',
           timestamp: new Date()
         };
-        setMessages(prev => [...prev, aiMessage]);
-        showToast('Failed to sign in. Please try again.', 'error');
-        setIsLoading(false);
-        return;
-      }
-      // Success: continue as before
-      // Add user message (mask password)
-      const userMessage = {
-        id: Date.now().toString(),
-        text: '*'.repeat(password.length),
-        isUser: true,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, userMessage]);
-      setInputValue('');
-      setIsLoading(false);
-      setIsPasswordMode(false);
-      setPendingEmail('');
-      showToast('Sign in successful!', 'success');
-      setTimeout(() => {
-        window.location.href = '/admin';
-      }, 1000);
-    } catch (error) {
-      console.log('Unexpected error in handlePasswordSubmit:', error);
-      showToast('Failed to sign in. Please try again.', 'error');
-      setIsLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (isEmailMode) {
-        handleEmailSubmit();
-      } else if (isPasswordMode) {
-        handlePasswordSubmit();
+        setMessages(prev => [...prev, assistantMessage]);
       } else {
-        handleSendMessage();
+        throw new Error(data.error || 'Failed to get response');
       }
-    }
-  };
-
-  const handleDotClick = () => {
-    if (!isExpanded) {
-      setIsExpanded(true);
-    }
-  };
-
-  const handleClose = () => {
-    setIsExpanded(false);
-    setInputValue('');
-    setIsEmailMode(false);
-    setPendingEmail('');
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    if (suggestion === 'email') {
-      setIsEmailMode(true);
-      setShowSuggestions(false);
-      // Add AI message asking for email only
-      const aiMessage: Message = {
-        id: Date.now().toString(),
-        text: "Great! Please enter your email address to sign in or register.",
-        isUser: false,
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: 'Sorry, I encountered an error. Please try again.',
+        role: 'assistant',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, aiMessage]);
-    } else {
-      setInputValue(suggestion);
-      setTimeout(() => {
-        handleSendMessage();
-      }, 100);
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getPositionClasses = () => {
+    switch (position) {
+      case 'bottom-left':
+        return 'bottom-4 left-4';
+      case 'bottom-center':
+        return 'bottom-4 left-1/2 transform -translate-x-1/2';
+      default:
+        return 'bottom-4 right-4';
     }
   };
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-
-
-      {/* Suggestions - Only show when no messages */}
-      {showSuggestions && messages.length === 0 && (
-        <div className="mb-3 flex justify-center">
-          <button
-            onClick={() => handleSuggestionClick('email')}
-            className="bg-white text-black px-3 py-1.5 rounded-full shadow-lg text-xs font-medium hover:bg-gray-100 transition-colors flex items-center space-x-1"
-          >
-            <Mail className="h-3 w-3" />
-            <span>Sign In</span>
-          </button>
-        </div>
-      )}
-
-      {/* Message History - Above Input with Fade and Scroll */}
-      {isExpanded && messages.length > 0 && (
-        <div className="mb-3 max-w-xs mx-auto relative">
-          {/* Fade Background */}
-          <div className="absolute inset-0 bg-black bg-opacity-20 rounded-lg backdrop-blur-sm"></div>
-          
-          {/* Scrollable Messages */}
-          <div className="relative max-h-80 overflow-y-auto rounded-lg">
-            <div className="p-3 space-y-3">
+    <div className={`fixed ${getPositionClasses()} z-50`}>
+      {isExpanded ? (
+        <div className="w-80 flex flex-col animate-in slide-in-from-bottom-2 duration-300 ease-out bg-black/95 backdrop-blur-sm border border-white/10 rounded-2xl shadow-2xl">
+          {/* Chat Messages - Only show when there are messages */}
+          {messages.length > 0 && (
+            <div className="overflow-y-auto p-4 space-y-3 max-h-80 rounded-t-2xl bg-transparent mb-3">
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex items-start space-x-2 ${
-                  message.isUser ? 'flex-row-reverse space-x-reverse' : ''
-                }`}
-              >
-                {/* Avatar */}
-                {!message.isUser && (
-                  <div className="flex-shrink-0 w-6 h-6 bg-white rounded-full shadow-sm flex items-center justify-center">
-                    <div className="w-3 h-3 bg-white rounded-full shadow-inner"></div>
-                  </div>
+              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {message.role === 'assistant' && (
+                  <div className="w-6 h-6 bg-white rounded-full flex-shrink-0 mr-2"></div>
                 )}
-                
-                {/* Message Bubble */}
-                <div
-                  className={`text-xs px-3 py-2 rounded-lg max-w-[70%] ${
-                    message.isUser
-                      ? 'bg-white text-black shadow-sm'
-                      : 'bg-gray-200 text-black shadow-sm'
-                  }`}
-                >
-                  <p className="break-words">{message.text}</p>
-                  <p className="text-xs opacity-50 mt-1">
-                    {message.timestamp.toLocaleTimeString([], { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </p>
+                <div className={`max-w-xs ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+                  {message.role === 'user' && (
+                    <div className="text-xs text-gray-400 mb-1">You</div>
+                  )}
+                  <div className={`px-4 py-2.5 ${
+                    message.role === 'user' 
+                      ? 'bg-white text-black rounded-2xl rounded-br-md shadow-sm' 
+                      : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-2xl rounded-bl-md'
+                  }`}>
+                    <div className="text-sm leading-relaxed">{message.content}</div>
+                    <div className={`text-xs mt-1.5 ${
+                      message.role === 'user' ? 'text-gray-500' : 'text-white/50'
+                    }`}>
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
-            
             {isLoading && (
-              <div className="flex items-start space-x-2">
-                {/* Dot Avatar */}
-                <div className="flex-shrink-0 w-6 h-6 bg-white rounded-full shadow-sm flex items-center justify-center">
-                  <div className="w-3 h-3 bg-white rounded-full shadow-inner"></div>
-                </div>
-                
-                {/* Loading Message */}
-                <div className="bg-gray-200 text-black px-3 py-2 rounded-lg shadow-sm">
+              <div className="flex justify-start">
+                <div className="w-6 h-6 bg-white rounded-full flex-shrink-0 mr-2"></div>
+                <div className="px-3 py-2 rounded-2xl rounded-bl-md bg-gray-300">
                   <div className="flex space-x-1">
-                    <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-1 h-1 bg-black rounded-full animate-bounce"></div>
+                    <div className="w-1 h-1 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-1 h-1 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
               </div>
             )}
-            
-            {/* Invisible div for auto-scroll */}
             <div ref={messagesEndRef} />
-            </div>
           </div>
-        </div>
-      )}
+          )}
 
-      {/* Loading State - Above Input */}
-      {isExpanded && isLoading && messages.length === 0 && (
-        <div className="mb-3 flex justify-center">
-          <div className="bg-gray-200 text-black px-3 py-2 rounded-lg shadow-sm">
-            <div className="flex space-x-1">
-              <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce"></div>
-              <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Widget - Animated Container */}
-      <div className="flex flex-col items-center">
-        <div 
-          className={`
-            transition-all duration-500 ease-in-out
-            ${isExpanded 
-              ? 'w-80 max-w-[90vw] bg-white text-black rounded-full shadow-lg px-4 py-2' 
-              : 'w-10 h-10 bg-white text-black rounded-full shadow-lg hover:shadow-xl'
-            }
-            flex items-center justify-center cursor-pointer
-          `}
-          onClick={!isExpanded ? handleDotClick : undefined}
-        >
-          {!isExpanded ? (
-            /* Animated White Circle */
-            <div className="flex items-center justify-center w-full h-full relative">
-              {/* Pulse Ring Animation */}
-              <div className="absolute inset-0 rounded-full bg-white animate-ping opacity-20"></div>
-              <div className="absolute inset-1 rounded-full bg-white animate-ping opacity-30" style={{ animationDelay: '0.5s' }}></div>
-              <div className="absolute inset-2 rounded-full bg-white animate-ping opacity-40" style={{ animationDelay: '1s' }}></div>
-              
-              {/* Main Circle */}
-              <div className="relative w-5 h-5 bg-white rounded-full shadow-inner"></div>
-            </div>
-          ) : (
-            /* Expanded Input */
-            <div className="flex items-center space-x-2 w-full">
-              <input
-                type={isEmailMode ? "email" : isPasswordMode ? "password" : "text"}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={
-                  isEmailMode ? "Enter your email..." : 
-                  isPasswordMode ? "Enter your password..." : 
-                  "Type a message..."
-                }
-                className="flex-1 bg-transparent text-black placeholder-gray-500 focus:outline-none text-sm"
-                disabled={isLoading}
-                autoFocus
-                style={{ fontSize: '16px' }} // Prevents zoom on mobile
-              />
-              {isLoading ? (
-                <div className="flex space-x-1">
-                  <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          {/* Authentication or Input Field */}
+          {authMode !== 'none' ? (
+              <form onSubmit={handleAuthSubmit} className="p-3">
+                <div className="space-y-3">
+                  {authMode === 'email' && (
+                    <div>
+                      <label className="block text-xs text-white mb-1">Email</label>
+                      <div className="relative">
+                        <input
+                          type="email"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          placeholder="Enter your email"
+                          disabled={isLoading}
+                          className="w-full px-4 py-2 pr-20 bg-white text-black placeholder-gray-500 rounded-full focus:outline-none text-sm transition-all duration-300 ease-out focus:ring-2 focus:ring-white/20"
+                          autoFocus
+                        />
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+                          <button
+                            type="submit"
+                            disabled={isLoading || !authEmail.trim()}
+                            className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-out hover:bg-gray-400 hover:scale-105"
+                          >
+                            <span className="text-black text-xs">→</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCollapse}
+                            className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center transition-all duration-200 ease-out hover:bg-gray-400 hover:scale-105"
+                          >
+                            <span className="text-black text-sm">×</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {authMode === 'password' && (
+                    <div>
+                      <label className="block text-xs text-white mb-1">Password</label>
+                      <div className="relative">
+                        <input
+                          type="password"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          placeholder="Enter your password"
+                          disabled={isLoading}
+                          className="w-full px-4 py-2 pr-20 bg-white text-black placeholder-gray-500 rounded-full focus:outline-none text-sm transition-all duration-300 ease-out focus:ring-2 focus:ring-white/20"
+                          autoFocus
+                        />
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+                          <button
+                            type="submit"
+                            disabled={isLoading || !authPassword.trim()}
+                            className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-out hover:bg-gray-400 hover:scale-105"
+                          >
+                            <span className="text-black text-xs">→</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAuthBack}
+                            className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center transition-all duration-200 ease-out hover:bg-gray-400 hover:scale-105"
+                          >
+                            <span className="text-black text-xs">←</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCollapse}
+                            className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center transition-all duration-200 ease-out hover:bg-gray-400 hover:scale-105"
+                          >
+                            <span className="text-black text-sm">×</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {authError && (
+                    <div className="text-xs text-red-400 bg-red-900/20 px-3 py-2 rounded">
+                      {authError}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <button
-                  onClick={
-                    isEmailMode ? handleEmailSubmit : 
-                    isPasswordMode ? handlePasswordSubmit : 
-                    handleSendMessage
-                  }
-                  disabled={!inputValue.trim()}
-                  className="bg-black text-white rounded-full p-1.5 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="p-4 pt-0">
+                <div className="space-y-3">
+                  {showAuth && (
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={handleSignIn}
+                        className="w-32 px-3 py-1.5 bg-white text-black rounded-full text-xs font-medium transition-all duration-200 ease-out hover:bg-gray-100 flex items-center justify-center gap-1"
+                      >
+                        <Mail className="h-3 w-3" />
+                        Get started
+                      </button>
+                    </div>
+                  )}
+                  <div className="relative">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder="Type a message..."
+                      disabled={isLoading}
+                      className="w-full px-4 py-3 pr-20 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/50 rounded-full focus:outline-none text-sm transition-all duration-300 ease-out focus:ring-2 focus:ring-white/30 focus:border-white/30"
+                    />
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+                      <button
+                        type="submit"
+                        disabled={isLoading || !inputValue.trim()}
+                        className="w-8 h-8 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-out hover:bg-white/30 hover:scale-105"
+                      >
+                        <Send className="h-3 w-3 text-white" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCollapse}
+                        className="w-8 h-8 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center transition-all duration-200 ease-out hover:bg-white/30 hover:scale-105"
+                      >
+                        <span className="text-white text-sm">×</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            )}
+        </div>
+      ) : (
+        <div className="relative">
+          {/* Dynamic Hint Text with Arrow - only show when not expanded */}
+          {!isExpanded && (
+            <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 text-center">
+              {/* Pill-shaped hint text */}
+              <div className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-2 transition-all duration-300 ${isHintVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                <div className="text-sm text-white/90 font-medium whitespace-nowrap">
+                  {hintTexts[hintIndex]}
+                </div>
+              </div>
+              {/* Arrow pointing down to the circle */}
+              <div className="flex justify-center">
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  className="text-white/50 animate-bounce"
                 >
-                  <Send className="h-3 w-3" />
-                </button>
-              )}
-              <button
-                onClick={handleClose}
-                className="text-gray-500 hover:text-black transition-colors"
-              >
-                <span className="text-base">×</span>
-              </button>
+                  <path 
+                    d="M7 10l5 5 5-5" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
             </div>
           )}
+          
+          <button
+            onClick={handleExpand}
+            className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-all duration-300 ease-out animate-pulse hover:shadow-xl"
+          >
+            {/* <Bot className="h-5 w-5 text-black" /> */}
+          </button>
         </div>
-        
-
-      </div>
+      )}
     </div>
   );
 }

@@ -19,7 +19,7 @@ CREATE TABLE public.sites (
     domain TEXT NOT NULL,
     status TEXT DEFAULT 'pending' CHECK (status IN ('active', 'inactive', 'pending')),
     setup_status TEXT DEFAULT 'not_connected' CHECK (setup_status IN ('connected', 'not_connected', 'pending')),
-    ai_model TEXT DEFAULT 'GPT-4',
+    ai_model TEXT DEFAULT 'gpt-3.5-turbo-0125',
     accuracy NUMERIC(5,2) DEFAULT 0,
     response_time TEXT DEFAULT '0s',
     total_chats INTEGER DEFAULT 0,

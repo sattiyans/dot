@@ -2,45 +2,88 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useSites } from '@/hooks/useSites';
+import { useDots } from '@/hooks/useDots';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Plus, Globe, MessageCircle, Users, Code, Activity, Zap, Brain, Info, Palette, Settings, Sparkles, X, Check, Copy } from 'lucide-react';
+import { Plus, Globe, MessageSquare, Activity, Brain, X, Check, Copy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import type { Site } from '@/hooks/useSites';
+import type { Dot } from '@/hooks/useDots';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const { sites, createSite } = useSites();
-  const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
+  const { dots, loading: dotsLoading, createDot, updateDot, deleteDot, fetchDots } = useDots();
+  const [isAddDotModalOpen, setIsAddDotModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [selectedSite, setSelectedSite] = useState<Site | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [dotToDelete, setDotToDelete] = useState<Dot | null>(null);
+  const [selectedDot, setSelectedDot] = useState<Dot | null>(null);
   const [copied, setCopied] = useState(false);
+  const [scrapingDots, setScrapingDots] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ name: '', domain: '' });
+  const [settingsForm, setSettingsForm] = useState({
+    theme: 'dark',
+    size: 'medium',
+    position: 'bottom-center',
+    animation: 'pulse',
+    autoOpen: false,
+    soundEnabled: true,
+    typingIndicator: true,
+          aiModel: 'gpt-3.5-turbo', // Free tier compatible model
+    temperature: '0.7',
+    context: '',
+    welcomeMessage: 'Hi! I\'m your Dot assistant. Ask me anything about our company, products, or services.',
+    aiInstructions: 'Focus on extracting information about our products, services, pricing, and how we help customers. Pay special attention to our unique value propositions and key differentiators.'
+  });
   const { showToast } = useToast();
-  const addSiteModalRef = useRef<HTMLDivElement>(null);
+  const addDotModalRef = useRef<HTMLDivElement>(null);
   const settingsModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ? { id: data.user.id, email: data.user.email ?? '' } : null);
-      setLoading(false);
+    const checkAuth = async () => {
+      try {
+        // First try to get the current session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setUser({ id: session.user.id, email: session.user.email ?? '' });
+        } else {
+          // If no session, try to get user directly
+          const { data: { user } } = await supabase.auth.getUser();
+          setUser(user ? { id: user.id, email: user.email ?? '' } : null);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUser({ id: session.user.id, email: session.user.email ?? '' });
+      } else {
+        setUser(null);
+      }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (isAddSiteModalOpen && addSiteModalRef.current) {
-      addSiteModalRef.current.focus();
+    if (isAddDotModalOpen && addDotModalRef.current) {
+      addDotModalRef.current.focus();
     }
-  }, [isAddSiteModalOpen]);
+  }, [isAddDotModalOpen]);
 
   useEffect(() => {
     if (isSettingsModalOpen && settingsModalRef.current) {
@@ -49,24 +92,25 @@ export default function AdminDashboard() {
   }, [isSettingsModalOpen]);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen text-white">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-lg">Loading...</div>
+      </div>
+    );
   }
+  
   if (!user) {
-    return <div className="flex items-center justify-center min-h-screen text-white">Please log in to access the admin dashboard.</div>;
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-lg">Please log in to access the admin dashboard.</div>
+      </div>
+    );
   }
 
   const stats = [
-    { title: 'Total Sites', value: sites.length.toString(), icon: Globe, trend: '+12%', trendUp: true },
-    { title: 'AI Conversations', value: sites.reduce((sum, site) => sum + site.total_chats, 0).toString(), icon: MessageCircle, trend: '+23%', trendUp: true },
-    { title: 'Active Users', value: '1,234', icon: Users, trend: '+8%', trendUp: true },
-    { title: 'AI Accuracy', value: sites.length > 0 ? Math.round(sites.reduce((sum, site) => sum + site.accuracy, 0) / sites.length).toString() + '%' : '0%', icon: Brain, trend: '+2%', trendUp: true },
-  ];
-
-  const recentActivity = [
-    { id: 1, type: 'chat', message: 'New conversation started on My Company Website', time: '2 min ago', site: 'mycompany.com' },
-    { id: 2, type: 'accuracy', message: 'AI accuracy improved to 94%', time: '15 min ago', site: 'mycompany.com' },
-    { id: 3, type: 'user', message: 'New user registered', time: '1 hour ago', site: 'myblog.com' },
-    { id: 4, type: 'chat', message: 'Complex query resolved successfully', time: '2 hours ago', site: 'myblog.com' },
+    { title: 'Total Dots', value: dots.length.toString(), icon: Globe },
+    { title: 'Conversations', value: dots.reduce((sum, dot) => sum + dot.total_chats, 0).toString(), icon: MessageSquare },
+    { title: 'Avg Accuracy', value: dots.length > 0 ? Math.round(dots.reduce((sum, dot) => sum + dot.accuracy, 0) / dots.length).toString() + '%' : '0%', icon: Brain },
   ];
 
   const aiInsights = [
@@ -76,13 +120,22 @@ export default function AdminDashboard() {
     { title: 'AI Learning Rate', value: 'High', trend: 'Improving daily' },
   ];
 
+  const recentActivity = [
+    { id: 1, type: 'chat', message: 'New conversation started on My Company Website', time: '2 min ago', dot: 'mycompany.com' },
+    { id: 2, type: 'accuracy', message: 'AI accuracy improved to 94%', time: '15 min ago', dot: 'mycompany.com' },
+    { id: 3, type: 'user', message: 'New user registered', time: '1 hour ago', dot: 'myblog.com' },
+    { id: 4, type: 'chat', message: 'Complex query resolved successfully', time: '2 hours ago', dot: 'myblog.com' },
+  ];
+
   const handleCopyCode = async () => {
-    const embedCode = `<script src="https://cdn.d0t.my/dot.js" defer></script>
+    const embedCode = `<!-- Dot AI Assistant -->
+<script src="https://cdn.d0t.my/dot.js" defer></script>
 <script>
   window.DOT_CHATBOT = {
-    siteId: '${selectedSite?.id}',
-    welcomeMessage: "Ask me anything about us",
-    theme: "dark"
+    dotId: '${selectedDot?.id}',
+    theme: '${settingsForm.theme}',
+    position: '${settingsForm.position}',
+    welcomeMessage: '${settingsForm.welcomeMessage.replace(/'/g, "\\'")}'
   };
 </script>`;
     
@@ -97,360 +150,471 @@ export default function AdminDashboard() {
     }
   };
 
-  const openSettingsModal = (site: Site) => {
-    setSelectedSite(site);
+  const openSettingsModal = (dot: Dot) => {
+    setSelectedDot(dot);
+    // Initialize settings form with current dot settings
+    setSettingsForm({
+      theme: dot.theme || 'dark',
+      size: dot.size || 'medium',
+      position: dot.position || 'bottom-center',
+      animation: dot.animation || 'pulse',
+      autoOpen: dot.auto_open || false,
+      soundEnabled: dot.sound_enabled || true,
+      typingIndicator: dot.typing_indicator || true,
+              aiModel: 'gpt-3.5-turbo', // Free tier compatible model
+      temperature: dot.temperature?.toString() || '0.7',
+      context: dot.context || '',
+      welcomeMessage: dot.welcome_message || 'Hi! I\'m your Dot assistant. Ask me anything about our company, products, or services.',
+      aiInstructions: dot.ai_instructions || 'Focus on extracting information about our products, services, pricing, and how we help customers. Pay special attention to our unique value propositions and key differentiators.'
+    });
     setIsSettingsModalOpen(true);
   };
 
+  const handleSettingsChange = (field: string, value: string | boolean | number) => {
+    setSettingsForm(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleSaveSettings = async () => {
+    if (!selectedDot) return;
+    
+    // Validate welcome message
+    if (!settingsForm.welcomeMessage.trim()) {
+      showToast('Welcome message cannot be empty', 'error');
+      return;
+    }
+
+    if (settingsForm.welcomeMessage.length > 500) {
+      showToast('Welcome message must be less than 500 characters', 'error');
+      return;
+    }
+
+    // Validate temperature
+    const temp = parseFloat(settingsForm.temperature);
+    if (isNaN(temp) || temp < 0 || temp > 2) {
+      showToast('Temperature must be between 0 and 2', 'error');
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+          await updateDot(selectedDot.id, {
+      theme: settingsForm.theme,
+      size: settingsForm.size,
+      position: settingsForm.position,
+      animation: settingsForm.animation,
+      auto_open: settingsForm.autoOpen,
+      sound_enabled: settingsForm.soundEnabled,
+      typing_indicator: settingsForm.typingIndicator,
+              ai_model: 'gpt-3.5-turbo', // Free tier compatible model
+      temperature: parseFloat(settingsForm.temperature),
+      context: settingsForm.context,
+      welcome_message: settingsForm.welcomeMessage,
+      ai_instructions: settingsForm.aiInstructions,
+    });
+      
       showToast('Dot settings saved successfully!', 'success');
       setIsSettingsModalOpen(false);
-    } catch (error) {
+    } catch {
       showToast('Failed to save settings. Please try again.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAddSite = async () => {
+  const handleAddDot = async () => {
+    if (!user) {
+      showToast('Please log in to create a dot', 'error');
+      return;
+    }
+
     if (!formData.name || !formData.domain) {
       showToast('Please fill in all required fields', 'error');
       return;
     }
 
+    // Validate name length
+    if (formData.name.length < 2) {
+      showToast('Dot name must be at least 2 characters long', 'error');
+      return;
+    }
+
+    if (formData.name.length > 50) {
+      showToast('Dot name must be less than 50 characters', 'error');
+      return;
+    }
+
+    let cleanDomain = formData.domain.trim().toLowerCase();
+    cleanDomain = cleanDomain.replace(/^https?:\/\//, '');
+    cleanDomain = cleanDomain.replace(/^www\./, '');
+    
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(cleanDomain)) {
+      showToast('Please enter a valid domain name', 'error');
+      return;
+    }
+
+    // Check if domain already exists for this user
+    const existingDot = dots.find(dot => dot.domain === cleanDomain);
+    if (existingDot) {
+      showToast('A dot with this domain already exists', 'error');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await createSite({
+      await createDot({
         name: formData.name,
-        domain: formData.domain,
-        status: 'pending',
-        setup_status: 'not_connected',
-        ai_model: 'GPT-4',
-        accuracy: 0,
-        response_time: '0s',
-        total_chats: 0
+        domain: cleanDomain
       });
       
-      setIsAddSiteModalOpen(false);
+      setIsAddDotModalOpen(false);
       setFormData({ name: '', domain: '' });
-    } catch (error) {
+    } catch {
       // Error is already handled by the hook
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleDeleteDot = async () => {
+    if (!dotToDelete) return;
+    
+    setIsLoading(true);
+    try {
+      await deleteDot(dotToDelete.id);
+      setIsDeleteModalOpen(false);
+      setDotToDelete(null);
+    } catch {
+      // Error is already handled by the hook
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openDeleteModal = (dot: Dot) => {
+    setDotToDelete(dot);
+    setIsDeleteModalOpen(true);
+  };
+
+
+
+  const handleAIAnalyze = async (dot: Dot) => {
+    if (!dot.domain) {
+      showToast('No domain configured for this dot', 'error');
+      return;
+    }
+
+    setScrapingDots(prev => new Set(prev).add(dot.id));
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dotId: dot.id,
+          url: dot.domain,
+          customInstructions: dot.ai_instructions,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast(`Successfully analyzed website and created ${data.chunksCreated} knowledge chunks!`, 'success');
+        // Update the dot status using the updateDot function
+        await updateDot(dot.id, {
+          setup_status: 'connected',
+          updated_at: new Date().toISOString()
+        });
+        // Refresh dots data to get updated stats
+        await fetchDots();
+      } else {
+        showToast(data.error || 'Failed to analyze website', 'error');
+      }
+    } catch (error) {
+      console.error('AI Analysis error:', error);
+      showToast('Failed to analyze website. Please try again.', 'error');
+    } finally {
+      setScrapingDots(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(dot.id);
+        return newSet;
+      });
+    }
+  };
+
+
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-400';
+      case 'pending': return 'bg-yellow-400';
+      case 'error': return 'bg-red-400';
+      default: return 'bg-gray-400';
+    }
+  };
+
+  const getSetupStatusColor = (setupStatus: string) => {
+    switch (setupStatus) {
+      case 'connected': return 'bg-green-400';
+      case 'not_connected': return 'bg-yellow-400';
+      case 'error': return 'bg-red-400';
+      default: return 'bg-gray-400';
+    }
+  };
+
   return (
-    <div className="relative z-10 p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Enhanced Header Section */}
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-8 lg:mb-12 gap-4">
-        <div>
-          <h1 className="text-3xl lg:text-4xl font-extrabold tracking-wider mb-2" style={{ 
-            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-            background: 'linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            Dashboard
-          </h1>
-          <p className="text-white/60 font-medium">Monitor and manage your Dots performance</p>
-        </div>
-        <Button 
-          onClick={() => setIsAddSiteModalOpen(true)}
-          className="bg-white text-black hover:bg-gray-100 font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg w-full lg:w-auto"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add New Site
-        </Button>
-      </div>
-
-      {/* Enhanced Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8 lg:mb-12">
-        {isLoading ? (
-          // Skeleton loading state
-          Array.from({ length: 4 }).map((_, index) => (
-            <Card key={index} className="bg-white/5 backdrop-blur-sm border border-white/10">
-              <CardContent className="p-4 lg:p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <Skeleton className="w-12 h-12 rounded-full" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-16" />
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          stats.map((stat, index) => (
-            <Card key={index} className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/15 transition-all duration-300 transform hover:scale-105 group">
-              <CardContent className="p-4 lg:p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-3 rounded-full bg-white/10 text-white group-hover:scale-110 transition-transform duration-300">
-                    <stat.icon className="h-6 w-6" />
-                  </div>
-                  <Badge variant={stat.trendUp ? "default" : "secondary"} className="text-xs bg-white text-black">
-                    {stat.trend}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-white/60 font-medium mb-1">{stat.title}</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-white">{stat.value}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      {/* AI Insights Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 lg:mb-12">
-        <div className="lg:col-span-2">
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Brain className="mr-2 h-5 w-5 text-white" />
-                Dot Performance Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {aiInsights.map((insight, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
-                  <div>
-                    <p className="text-sm text-white/60 font-medium">{insight.title}</p>
-                    <p className="text-lg font-semibold text-white">{insight.value}</p>
-                  </div>
-                  <Badge variant="outline" className="text-xs border-white/20 text-white/80">
-                    {insight.trend}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10 h-full">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Activity className="mr-2 h-5 w-5 text-white" />
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-white/5 transition-colors">
-                  <div className="w-2 h-2 bg-white rounded-full mt-2 flex-shrink-0"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white font-medium truncate">{activity.message}</p>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-xs text-white/60">{activity.time}</span>
-                      <span className="text-xs text-white/40">•</span>
-                      <span className="text-xs text-white/60">{activity.site}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Enhanced Sites Section */}
-      <div className="space-y-4 lg:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h2 className="text-xl lg:text-2xl font-bold text-white flex items-center">
-            <Globe className="mr-2 h-5 w-5 text-white" />
-            Your Dots
-          </h2>
-        </div>
-        
-        {isLoading ? (
-          <div className="grid gap-4">
-            {Array.from({ length: 2 }).map((_, index) => (
-              <Card key={index} className="bg-white/5 backdrop-blur-sm border border-white/10">
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <Skeleton className="h-6 w-32" />
-                        <Skeleton className="h-4 w-16" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                      <Skeleton className="h-4 w-24 mb-3" />
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <div key={i} className="text-center p-2 bg-white/5 rounded-lg border border-white/10">
-                            <Skeleton className="h-3 w-12 mx-auto mb-1" />
-                            <Skeleton className="h-4 w-8 mx-auto" />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-8 w-24" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <div className="border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Dashboard</h1>
+              <p className="text-white/60 mt-1">Manage your AI assistants</p>
+            </div>
+            <Button 
+              onClick={() => setIsAddDotModalOpen(true)}
+              className="bg-white text-black hover:bg-gray-100 font-medium px-6 py-2"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Dot
+            </Button>
           </div>
-        ) : sites.length === 0 ? (
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
-            <CardContent className="p-8 lg:p-12 text-center">
-              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 lg:mb-6">
-                <Brain className="h-6 w-6 lg:h-8 lg:w-8 text-white" />
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
+          {stats.map((stat, index) => (
+            <div key={index} className="bg-white/5 border border-white/10 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white/60 text-sm font-medium">{stat.title}</p>
+                  <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                </div>
+                <div className="bg-white/10 p-3 rounded-lg">
+                  <stat.icon className="h-5 w-5" />
+                </div>
               </div>
-              <h3 className="text-lg lg:text-xl font-semibold text-white mb-2">No Dots yet</h3>
-              <p className="text-white/60 mb-6 lg:mb-8 max-w-md mx-auto text-sm lg:text-base">
-                Get started by adding your first website to deploy intelligent Dots
-              </p>
-              <Button 
-                onClick={() => setIsAddSiteModalOpen(true)}
-                className="bg-white text-black hover:bg-gray-100 font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Your First Dot
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {sites.map((site) => (
-              <Card key={site.id} className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/15 transition-all duration-300 group">
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="font-semibold text-white text-base lg:text-lg">{site.name}</h3>
-                        <Badge variant="outline" className="text-xs border-white/30 text-white">
-                          {site.status}
-                        </Badge>
-                        <div className="flex items-center space-x-1">
-                          <div className={`w-2 h-2 rounded-full ${
-                            site.setup_status === 'connected' ? 'bg-white animate-pulse' : 
-                            site.setup_status === 'not_connected' ? 'bg-white/60' : 
-                            'bg-white/40'
-                          }`}></div>
-                          <span className={`text-xs font-medium ${
-                            site.setup_status === 'connected' ? 'text-white' : 
-                            site.setup_status === 'not_connected' ? 'text-white/60' : 
-                            'text-white/40'
-                          }`}>
-                            {site.setup_status === 'connected' ? 'Connected' : 
-                             site.setup_status === 'not_connected' ? 'Not Setup' : 
+            </div>
+          ))}
+        </div>
+
+        {/* Analytics Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
+          {/* AI Insights */}
+          <div className="lg:col-span-2">
+            <div className="bg-white/5 border border-white/10 rounded-lg p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <Brain className="h-5 w-5" />
+                <h3 className="text-lg font-semibold">AI Performance Insights</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {aiInsights.map((insight, index) => (
+                  <div key={index} className="bg-white/5 border border-white/10 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-white/60 font-medium">{insight.title}</p>
+                      <span className="text-xs text-green-400">{insight.trend}</span>
+                    </div>
+                    <p className="text-lg font-semibold">{insight.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div>
+            <div className="bg-white/5 border border-white/10 rounded-lg p-6 h-full">
+              <div className="flex items-center gap-2 mb-6">
+                <Activity className="h-5 w-5" />
+                <h3 className="text-lg font-semibold">Recent Activity</h3>
+              </div>
+              <div className="space-y-4">
+                {recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex items-start gap-3 p-3 bg-white/5 rounded-lg border border-white/10">
+                    <div className="w-2 h-2 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white font-medium">{activity.message}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-white/60">{activity.time}</span>
+                        <span className="text-xs text-white/40">•</span>
+                        <span className="text-xs text-white/60">{activity.dot}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Dots List */}
+        <div>
+          <h2 className="text-xl font-semibold mb-6">Your Dots</h2>
+          
+          {dotsLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="bg-white/5 border border-white/10 rounded-lg p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : dots.length === 0 ? (
+            <div className="bg-white/5 border border-white/10 rounded-lg p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="bg-white/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Plus className="h-8 w-8" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">No Dots yet</h3>
+                <p className="text-white/60 mb-6">Create your first AI assistant to get started</p>
+                <Button 
+                  onClick={() => setIsAddDotModalOpen(true)}
+                  className="bg-white text-black hover:bg-gray-100 font-medium"
+                >
+                  Create First Dot
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {dots.map((dot) => (
+                <div key={dot.id} className="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/10 transition-colors">
+                  {/* Header Section */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-lg truncate">{dot.name}</h3>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className={`w-2 h-2 rounded-full ${getStatusColor(dot.status)}`}></div>
+                          <span className="text-sm text-white/60 capitalize">{dot.status}</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className={`w-2 h-2 rounded-full ${getSetupStatusColor(dot.setup_status)}`}></div>
+                          <span className="text-sm text-white/60">
+                            {dot.setup_status === 'connected' ? 'Connected' : 
+                             dot.setup_status === 'not_connected' ? 'Not Setup' : 
                              'Error'}
                           </span>
                         </div>
                       </div>
-                      <p className="text-white/60 font-medium text-sm lg:text-base mb-3">{site.domain}</p>
-                      
-                      {/* AI Performance Metrics */}
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        <div className="text-center p-2 bg-white/5 rounded-lg border border-white/10">
-                          <p className="text-xs text-white/60">Dot Accuracy</p>
-                          <p className="text-sm font-bold text-white">{site.accuracy}%</p>
-                        </div>
-                        <div className="text-center p-2 bg-white/5 rounded-lg border border-white/10">
-                          <p className="text-xs text-white/60">Response Time</p>
-                          <p className="text-sm font-bold text-white">{site.response_time}</p>
-                        </div>
-                        <div className="text-center p-2 bg-white/5 rounded-lg border border-white/10">
-                          <p className="text-xs text-white/60">Total Chats</p>
-                          <p className="text-sm font-bold text-white">{site.total_chats}</p>
-                        </div>
-                        <div className="text-center p-2 bg-white/5 rounded-lg border border-white/10">
-                          <p className="text-xs text-white/60">Model</p>
-                          <p className="text-sm font-bold text-white">{site.ai_model}</p>
-                        </div>
-                        <div className="text-center p-2 bg-white/5 rounded-lg border border-white/10">
-                          <p className="text-xs text-white/60">Last Seen</p>
-                          <p className="text-sm font-bold text-white">{site.last_seen}</p>
-                        </div>
-                      </div>
+                      <p className="text-white/60 truncate">{dot.domain}</p>
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="text-right">
-                        <p className="text-xs text-white/60">Last Activity</p>
-                        <p className="text-sm font-medium text-white">{site.last_activity}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          onClick={() => openSettingsModal(site)}
-                          className="bg-white text-black hover:bg-gray-100 font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
-                        >
-                          <Settings className="mr-1 h-3 w-3" />
-                          Dot Settings
-                        </Button>
-                      </div>
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAIAnalyze(dot)}
+                        className="border-white/20 text-white hover:bg-white/10"
+                        disabled={scrapingDots.has(dot.id)}
+                        title="AI-powered analysis - understands and structures business information"
+                      >
+                        {scrapingDots.has(dot.id) ? 'Analyzing...' : 'Analyze'}
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openSettingsModal(dot)}
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        Settings
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(`/test-chatbot?dotId=${dot.id}`, '_blank')}
+                        className="border-white/20 text-white hover:bg-white/10"
+                        title="Test the chatbot"
+                      >
+                        Test
+                      </Button>
+                      <Button 
+                        size="sm"
+                        onClick={() => openDeleteModal(dot)}
+                        className="bg-red-500 hover:bg-red-600 text-white"
+                      >
+                        Delete
+                      </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                  
+                  {/* Stats Section */}
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                    <span className="text-white/60 flex-shrink-0">
+                      <span className="font-semibold">{dot.total_chats}</span> conversations
+                    </span>
+                    <span className="text-white/60 flex-shrink-0">
+                      <span className="font-semibold">{dot.accuracy}%</span> accuracy
+                    </span>
+                    <span className="text-white/60 flex-shrink-0">{dot.ai_model}</span>
+                    <span className="text-white/60 flex-shrink-0">
+                      Last seen: {dot.last_seen ? new Date(dot.last_seen).toLocaleDateString() : 'Never'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Add Site Modal */}
-      {isAddSiteModalOpen && (
+      {/* Add Dot Modal */}
+      {isAddDotModalOpen && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={(e) => e.target === e.currentTarget && setIsAddSiteModalOpen(false)}
-          onKeyDown={(e) => e.key === 'Escape' && setIsAddSiteModalOpen(false)}
+          onClick={(e) => e.target === e.currentTarget && setIsAddDotModalOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setIsAddDotModalOpen(false)}
           tabIndex={-1}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-dot-modal-title"
         >
-          <Card ref={addSiteModalRef} className="bg-black border border-white/20 w-full max-w-md">
+          <Card ref={addDotModalRef} className="bg-black border border-white/20 w-full max-w-md">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle id="add-dot-modal-title" className="text-white flex items-center">
-                <Sparkles className="mr-2 h-5 w-5" />
-                Add New Dot
-              </CardTitle>
+              <CardTitle className="text-white">Create New Dot</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsAddSiteModalOpen(false)}
+                onClick={() => setIsAddDotModalOpen(false)}
                 className="text-white/60 hover:text-white hover:bg-white/10"
               >
                 <X className="h-4 w-4" />
               </Button>
             </CardHeader>
-            <CardContent className="input-group">
-              <div className="form-group">
-                <Label htmlFor="siteName" className="form-label">Site Name</Label>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="dotName" className="text-white">Dot Name</Label>
                 <Input
-                  id="siteName"
-                  placeholder="My Company Website"
+                  id="dotName"
+                  placeholder="My Company Assistant"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="form-input"
+                  className="mt-1 bg-white/5 border-white/20 text-white"
                 />
               </div>
-              <div className="form-group">
-                <Label htmlFor="domain" className="form-label">Domain</Label>
+              <div>
+                <Label htmlFor="domain" className="text-white">Domain</Label>
                 <Input
                   id="domain"
                   placeholder="mycompany.com"
                   value={formData.domain}
                   onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value }))}
-                  className="form-input"
+                  className="mt-1 bg-white/5 border-white/20 text-white"
                 />
+                <p className="text-xs text-white/40 mt-1">You can enter with or without https:// and www.</p>
               </div>
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-3 pt-4">
                 <Button 
-                  onClick={() => setIsAddSiteModalOpen(false)}
+                  onClick={() => setIsAddDotModalOpen(false)}
                   variant="ghost"
                   disabled={isLoading}
                   className="flex-1 text-white/60 hover:text-white hover:bg-white/10"
@@ -458,18 +622,11 @@ export default function AdminDashboard() {
                   Cancel
                 </Button>
                 <Button 
-                  onClick={handleAddSite}
+                  onClick={handleAddDot}
                   disabled={isLoading}
-                  className="flex-1 bg-white text-black hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-white text-black hover:bg-gray-100"
                 >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                      <span>Creating...</span>
-                    </div>
-                  ) : (
-                    'Deploy Dot'
-                  )}
+                  {isLoading ? 'Creating...' : 'Create Dot'}
                 </Button>
               </div>
             </CardContent>
@@ -477,10 +634,8 @@ export default function AdminDashboard() {
         </div>
       )}
 
-
-
-      {/* Enhanced Settings Modal */}
-      {isSettingsModalOpen && selectedSite && (
+      {/* Settings Modal */}
+      {isSettingsModalOpen && selectedDot && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setIsSettingsModalOpen(false)}
@@ -489,10 +644,7 @@ export default function AdminDashboard() {
         >
           <Card ref={settingsModalRef} className="bg-black border border-white/20 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-white flex items-center">
-                <Settings className="mr-2 h-5 w-5" />
-                Dot Settings - {selectedSite.name}
-              </CardTitle>
+              <CardTitle className="text-white">Dot Settings - {selectedDot.name}</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
@@ -503,194 +655,58 @@ export default function AdminDashboard() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Connection Status */}
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    selectedSite.setup_status === 'connected' ? 'bg-white animate-pulse' : 
-                    selectedSite.setup_status === 'not_connected' ? 'bg-white/60' : 
-                    'bg-white/40'
-                  }`}></div>
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      {selectedSite.setup_status === 'connected' ? 'Dot is connected and active' : 
-                       selectedSite.setup_status === 'not_connected' ? 'Dot is not set up on your website' : 
-                       'Connection error detected'}
-                    </p>
-                    <p className="text-xs text-white/60">
-                      Last seen: {selectedSite.last_seen}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className={`text-xs ${
-                  selectedSite.setup_status === 'connected' ? 'border-white/30 text-white' : 
-                  selectedSite.setup_status === 'not_connected' ? 'border-white/20 text-white/60' : 
-                  'border-white/10 text-white/40'
-                }`}>
-                  {selectedSite.setup_status === 'connected' ? 'Connected' : 
-                   selectedSite.setup_status === 'not_connected' ? 'Not Setup' : 
-                   'Error'}
-                </Badge>
-              </div>
-
-              {/* General Settings */}
+              {/* Basic Settings */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Settings className="mr-2 h-4 w-4" />
-                  General Settings
-                </h3>
-                
-                <div className="form-group">
-                  <Label htmlFor="welcomeMessage" className="form-label">Welcome Message</Label>
-                  <Textarea
-                    id="welcomeMessage"
-                    placeholder="Hi! I'm your Dot assistant. Ask me anything about our company, products, or services."
-                    className="form-textarea"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Label htmlFor="dotName" className="form-label">Dot Name</Label>
-                  <Input
-                    id="dotName"
-                    placeholder="My Company Dot"
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                <h3 className="text-lg font-semibold text-white">Basic Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="enabled" className="form-label">Enable Dot</Label>
-                    <p className="text-xs text-white/40">Turn your Dot on or off</p>
-                  </div>
-                  <Switch id="enabled" defaultChecked />
-                </div>
-              </div>
-
-              {/* Appearance Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Palette className="mr-2 h-4 w-4" />
-                  Appearance
-                </h3>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="form-group">
-                    <Label htmlFor="theme" className="form-label">Dot Theme</Label>
+                    <Label htmlFor="theme" className="text-white">Theme</Label>
                     <select
                       id="theme"
-                      defaultValue="dark"
-                      className="form-select"
+                      value={settingsForm.theme}
+                      onChange={(e) => handleSettingsChange('theme', e.target.value)}
+                      className="mt-1 w-full bg-white/5 border border-white/20 text-white rounded-md px-3 py-2"
                     >
-                      <option value="dark">Dark (Black)</option>
-                      <option value="light">Light (White)</option>
-                      <option value="auto">Auto (Follows Website)</option>
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
                     </select>
                   </div>
-
-                  <div className="form-group">
-                    <Label htmlFor="size" className="form-label">Dot Size</Label>
+                  <div>
+                    <Label htmlFor="position" className="text-white">Position</Label>
                     <select
-                      id="size"
-                      defaultValue="medium"
-                      className="form-select"
+                      id="position"
+                      value={settingsForm.position}
+                      onChange={(e) => handleSettingsChange('position', e.target.value)}
+                      className="mt-1 w-full bg-white/5 border border-white/20 text-white rounded-md px-3 py-2"
                     >
-                      <option value="small">Small</option>
-                      <option value="medium">Medium</option>
-                      <option value="large">Large</option>
+                      <option value="bottom-center">Bottom Center</option>
+                      <option value="bottom-left">Bottom Left</option>
+                      <option value="bottom-right">Bottom Right</option>
                     </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <Label htmlFor="position" className="form-label">Dot Position</Label>
-                  <select
-                    id="position"
-                    defaultValue="bottom-center"
-                    className="form-select"
-                  >
-                    <option value="bottom-center">Bottom Center</option>
-                    <option value="bottom-left">Bottom Left</option>
-                    <option value="bottom-right">Bottom Right</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <Label htmlFor="animation" className="form-label">Animation Style</Label>
-                  <select
-                    id="animation"
-                    defaultValue="pulse"
-                    className="form-select"
-                  >
-                    <option value="pulse">Pulse</option>
-                    <option value="bounce">Bounce</option>
-                    <option value="none">None</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Behavior Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Zap className="mr-2 h-4 w-4" />
-                  Behavior
-                </h3>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
-                    <div>
-                      <Label htmlFor="autoOpen" className="form-label">Auto-open on Page Load</Label>
-                      <p className="text-xs text-white/40">Automatically open chat when page loads</p>
-                    </div>
-                    <Switch id="autoOpen" />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
-                    <div>
-                      <Label htmlFor="soundEnabled" className="form-label">Sound Notifications</Label>
-                      <p className="text-xs text-white/40">Play sound when new messages arrive</p>
-                    </div>
-                    <Switch id="soundEnabled" defaultChecked />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
-                    <div>
-                      <Label htmlFor="typingIndicator" className="form-label">Show Typing Indicator</Label>
-                      <p className="text-xs text-white/40">Display typing animation when Dot is responding</p>
-                    </div>
-                    <Switch id="typingIndicator" defaultChecked />
                   </div>
                 </div>
               </div>
 
               {/* AI Settings */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Brain className="mr-2 h-4 w-4" />
-                  AI Configuration
-                </h3>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="form-group">
-                    <Label htmlFor="aiModel" className="form-label">AI Model</Label>
-                    <select
+                <h3 className="text-lg font-semibold text-white">AI Configuration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="aiModel" className="text-white">AI Model</Label>
+                    <input
                       id="aiModel"
-                      defaultValue="gpt-4"
-                      className="form-select"
-                    >
-                      <option value="gpt-4">GPT-4 (Recommended)</option>
-                      <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                      <option value="claude-3">Claude 3</option>
-                    </select>
+                      value="GPT-3.5 Turbo"
+                      disabled
+                      className="mt-1 w-full bg-white/5 border border-white/20 text-white rounded-md px-3 py-2 opacity-50 cursor-not-allowed"
+                    />
                   </div>
-
-                  <div className="form-group">
-                    <Label htmlFor="temperature" className="form-label">Creativity Level</Label>
+                  <div>
+                    <Label htmlFor="temperature" className="text-white">Creativity</Label>
                     <select
                       id="temperature"
-                      defaultValue="0.7"
-                      className="form-select"
+                      value={settingsForm.temperature}
+                      onChange={(e) => handleSettingsChange('temperature', e.target.value)}
+                      className="mt-1 w-full bg-white/5 border border-white/20 text-white rounded-md px-3 py-2"
                     >
                       <option value="0.3">Conservative</option>
                       <option value="0.7">Balanced</option>
@@ -698,68 +714,68 @@ export default function AdminDashboard() {
                     </select>
                   </div>
                 </div>
-
-                <div className="form-group">
-                  <Label htmlFor="context" className="form-label">Context Instructions</Label>
+                <div>
+                  <Label htmlFor="welcomeMessage" className="text-white">Welcome Message</Label>
                   <Textarea
-                    id="context"
-                    placeholder="Additional instructions for how your Dot should behave and respond..."
-                    className="form-textarea"
+                    id="welcomeMessage"
+                    value={settingsForm.welcomeMessage}
+                    onChange={(e) => handleSettingsChange('welcomeMessage', e.target.value)}
+                    className="mt-1 bg-white/5 border-white/20 text-white"
                     rows={3}
                   />
                 </div>
+                <div>
+                  <Label htmlFor="aiInstructions" className="text-white">AI Analysis Instructions</Label>
+                  <Textarea
+                    id="aiInstructions"
+                    value={settingsForm.aiInstructions}
+                    onChange={(e) => handleSettingsChange('aiInstructions', e.target.value)}
+                    className="mt-1 bg-white/5 border-white/20 text-white"
+                    rows={4}
+                    placeholder="Custom instructions for AI when analyzing your website..."
+                  />
+                  <p className="text-xs text-white/60 mt-1">
+                    Tell the AI what specific information to focus on when analyzing your website. 
+                    For example: "Focus on our pricing plans, customer testimonials, and unique features."
+                  </p>
+                </div>
               </div>
 
-              {/* Embed Code Section */}
-              <div className="space-y-4 pt-6 border-t border-white/10">
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Code className="mr-2 h-4 w-4" />
-                  Embed Code
-                </h3>
-                
-                <div className="form-group">
-                  <Label className="form-label">Copy this code and paste it into your website&apos;s HTML</Label>
-                  <div className="relative">
-                    <Textarea
-                      value={`<script src="https://cdn.d0t.my/dot.js" defer></script>
+              {/* Embed Code */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white">Embed Code</h3>
+                <p className="text-sm text-white/60">Add this code to your website&apos;s &lt;head&gt; section to enable your AI assistant.</p>
+                <div className="relative">
+                  <Textarea
+                    value={`<!-- Dot AI Assistant -->
+<script src="https://cdn.d0t.my/dot.js" defer></script>
 <script>
   window.DOT_CHATBOT = {
-    siteId: '${selectedSite?.id}',
-    position: 'bottom-center',
-    theme: 'dark',
-    welcomeMessage: 'Hi! I&apos;m your Dot assistant. Ask me anything about our company, products, or services.',
-    size: 'medium'
+    dotId: '${selectedDot?.id}',
+    theme: '${settingsForm.theme}',
+    position: '${settingsForm.position}',
+    welcomeMessage: '${settingsForm.welcomeMessage.replace(/'/g, "\\'")}'
   };
 </script>`}
-                      readOnly
-                      className="form-textarea font-mono text-sm h-32"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleCopyCode}
-                      className="absolute top-2 right-2 bg-white text-black hover:bg-gray-100"
-                    >
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                    readOnly
+                    className="bg-white/5 border-white/20 text-white font-mono text-sm"
+                    rows={7}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleCopyCode}
+                    className="absolute top-2 right-2 bg-white text-black hover:bg-gray-100"
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
                 </div>
-
-                {/* Instructions */}
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                  <h4 className="text-white font-semibold mb-2 flex items-center">
-                    <Info className="mr-2 h-4 w-4" />
-                    Installation Instructions
-                  </h4>
-                  <ol className="text-white/60 text-sm space-y-1 list-decimal list-inside">
-                    <li>Copy the embed code above</li>
-                    <li>Paste it into your website&apos;s HTML, preferably before the closing &lt;/body&gt; tag</li>
-                    <li>Save and publish your website</li>
-                    <li>Your Dot will appear in the configured position</li>
-                  </ol>
+                <div className="text-xs text-white/40 space-y-1">
+                  <p>• The assistant will appear as a floating dot on your website</p>
+                  <p>• Click the dot to start a conversation</p>
+                  <p>• All conversations are automatically saved and analyzed</p>
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <Button 
                   onClick={() => setIsSettingsModalOpen(false)}
@@ -767,22 +783,51 @@ export default function AdminDashboard() {
                   disabled={isLoading}
                   className="flex-1 text-white/60 hover:text-white hover:bg-white/10"
                 >
-                  Close
+                  Cancel
                 </Button>
                 <Button 
                   onClick={handleSaveSettings}
                   disabled={isLoading}
-                  className="flex-1 bg-white text-black hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-white text-black hover:bg-gray-100"
                 >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                      <span>Saving...</span>
-                    </div>
-                  ) : (
-                    'Save Dot Settings'
-                  )}
+                  {isLoading ? 'Saving...' : 'Save Settings'}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && dotToDelete && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={(e) => e.target === e.currentTarget && setIsDeleteModalOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setIsDeleteModalOpen(false)}
+          tabIndex={-1}
+        >
+          <Card className="bg-black border border-white/20 w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-white">Delete Dot</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center py-6">
+              <p className="text-white mb-6">Are you sure you want to delete &quot;{dotToDelete.name}&quot;? This action cannot be undone.</p>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  variant="ghost"
+                  disabled={isLoading}
+                  className="flex-1 text-white/60 hover:text-white hover:bg-white/10"
+                >
+                  Cancel
+                </Button>
+                                 <Button 
+                   onClick={handleDeleteDot}
+                   disabled={isLoading}
+                   className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                 >
+                   {isLoading ? 'Deleting...' : 'Delete Dot'}
+                 </Button>
               </div>
             </CardContent>
           </Card>
