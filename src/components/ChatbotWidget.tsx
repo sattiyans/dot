@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Mail } from 'lucide-react';
+import { Send, Mail } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const hintTexts = [
@@ -28,9 +28,7 @@ interface Message {
 
 interface ChatbotWidgetProps {
   dotId: string;
-  theme?: 'dark' | 'light';
   position?: 'bottom-right' | 'bottom-left' | 'bottom-center';
-  welcomeMessage?: string;
   onOpen?: () => void;
   onClose?: () => void;
   showAuth?: boolean;
@@ -38,9 +36,7 @@ interface ChatbotWidgetProps {
 
 export default function ChatbotWidget({
   dotId,
-  theme = 'dark',
   position = 'bottom-center',
-  welcomeMessage = "Hi! I'm your AI assistant. How can I help you today?",
   onOpen,
   onClose,
   showAuth = false
@@ -80,7 +76,7 @@ export default function ChatbotWidget({
     }, 3000); // Change hint every 3 seconds
 
     return () => clearInterval(interval);
-  }, [hintTexts.length]);
+  }, []);
 
   const handleExpand = () => {
     setIsExpanded(true);
@@ -352,7 +348,7 @@ export default function ChatbotWidget({
                       <button
                         type="button"
                         onClick={handleSignIn}
-                        className="w-32 px-3 py-1.5 bg-white text-black rounded-full text-xs font-medium transition-all duration-200 ease-out hover:bg-gray-100 flex items-center justify-center gap-1"
+                        className="mt-2 w-32 px-3 py-1.5 bg-white text-black rounded-full text-xs font-medium transition-all duration-200 ease-out hover:bg-gray-100 flex items-center justify-center gap-1"
                       >
                         <Mail className="h-3 w-3" />
                         Get started

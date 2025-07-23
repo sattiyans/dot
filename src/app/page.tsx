@@ -84,8 +84,6 @@ export default function LandingPage() {
       <ChatbotWidget 
         dotId="demo"
         position="bottom-center"
-        theme="dark"
-        welcomeMessage="Hi! I'm Dot, your AI assistant. How can I help you today?"
         showAuth={true}
       />
     </div>

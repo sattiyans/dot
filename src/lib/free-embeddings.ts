@@ -37,7 +37,7 @@ export class FreeEmbeddingService {
       .filter(word => word.length > 2);
     
     // Create a simple hash-based embedding
-    words.forEach((word, index) => {
+    words.forEach((word) => {
       const hash = this.simpleHash(word);
       const position = hash % 1536;
       embedding[position] += 1;

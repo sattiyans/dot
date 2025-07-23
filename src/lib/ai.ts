@@ -151,7 +151,7 @@ Key guidelines:
         encoding_format: 'float',
       });
 
-      return response.data.map((item, index) => ({
+      return response.data.map((item) => ({
         embedding: item.embedding,
         usage: {
           prompt_tokens: response.usage.prompt_tokens,

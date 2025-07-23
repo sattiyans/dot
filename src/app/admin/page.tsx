@@ -48,7 +48,7 @@ export default function AdminDashboard() {
     const checkAuth = async () => {
       try {
         // First try to get the current session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
           setUser({ id: session.user.id, email: session.user.email ?? '' });
@@ -736,7 +736,7 @@ export default function AdminDashboard() {
                   />
                   <p className="text-xs text-white/60 mt-1">
                     Tell the AI what specific information to focus on when analyzing your website. 
-                    For example: "Focus on our pricing plans, customer testimonials, and unique features."
+                    For example: &quot;Focus on our pricing plans, customer testimonials, and unique features.&quot;
                   </p>
                 </div>
               </div>
@@ -751,10 +751,10 @@ export default function AdminDashboard() {
 <script src="https://cdn.d0t.my/dot.js" defer></script>
 <script>
   window.DOT_CHATBOT = {
-    dotId: '${selectedDot?.id}',
-    theme: '${settingsForm.theme}',
-    position: '${settingsForm.position}',
-    welcomeMessage: '${settingsForm.welcomeMessage.replace(/'/g, "\\'")}'
+    dotId: &apos;${selectedDot?.id}&apos;,
+    theme: &apos;${settingsForm.theme}&apos;,
+    position: &apos;${settingsForm.position}&apos;,
+    welcomeMessage: &apos;${settingsForm.welcomeMessage.replace(/'/g, "\\'")}&apos;
   };
 </script>`}
                     readOnly

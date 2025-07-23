@@ -171,7 +171,7 @@ async function searchKnowledgeBase(dotId: string, query: string): Promise<string
       console.log('OpenAI embedding failed for query, using text search:', error);
     }
 
-    let chunks: any[] = [];
+    let chunks: Array<{ content: string }> = [];
 
     if (queryEmbedding) {
       // Use vector similarity search
@@ -200,11 +200,19 @@ async function searchKnowledgeBase(dotId: string, query: string): Promise<string
   }
 }
 
+interface Dot {
+  id: string;
+  name: string;
+  context?: string;
+  ai_model?: string;
+  temperature?: number;
+}
+
 async function generateResponse(
   message: string, 
   relevantChunks: string[], 
   history: Message[], 
-  dot: any,
+  dot: Dot,
   dotId: string
 ): Promise<string> {
   try {

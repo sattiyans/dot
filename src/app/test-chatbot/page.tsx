@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeftCircle, ArrowLeftIcon, Bot } from 'lucide-react';
+import { ArrowLeftIcon, Bot } from 'lucide-react';
 import Link from 'next/link';
 import ChatbotWidget from '@/components/ChatbotWidget';
 
@@ -14,7 +14,7 @@ interface Dot {
   welcome_message?: string;
 }
 
-export default function TestChatbotPage() {
+function TestChatbotContent() {
   const searchParams = useSearchParams();
   const dotId = searchParams.get('dotId') || 'your-dot-id';
   
@@ -103,11 +103,24 @@ export default function TestChatbotPage() {
         <ChatbotWidget
           dotId={dotId}
           position={dot?.position || 'bottom-center'}
-          theme={dot?.theme || 'dark'}
-          welcomeMessage={dot?.welcome_message || "Hi! I'm your AI assistant. How can I help you today?"}
           showAuth={false}
         />
       </div>
     </div>
+  );
+}
+
+export default function TestChatbotPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 bg-white rounded-full animate-pulse mx-auto mb-4"></div>
+          <p className="text-white/70">Loading...</p>
+        </div>
+      </div>
+    }>
+      <TestChatbotContent />
+    </Suspense>
   );
 } 
