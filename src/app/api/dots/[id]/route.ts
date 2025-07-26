@@ -132,7 +132,7 @@ export async function DELETE(
     }
 
     // Try to delete the dot (cascading delete should handle related records)
-    let { error: deleteError } = await supabase
+    const { error: deleteError } = await supabase
       .from('dots')
       .delete()
       .eq('id', id)
