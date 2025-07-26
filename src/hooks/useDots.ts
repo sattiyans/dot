@@ -149,20 +149,26 @@ export function useDots() {
   // Delete a dot
   const deleteDot = useCallback(async (id: string) => {
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
         throw new Error('User not authenticated');
       }
       
-      // Only allow deletion of dots owned by the user
-      const { error } = await supabase
-        .from('dots')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-        
-      if (error) throw error;
+      // Call the API route to delete the dot
+      const response = await fetch(`/api/dots/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete dot');
+      }
+      
       setDots(prev => prev.filter(dot => dot.id !== id));
       showToast('Dot deleted successfully!', 'success');
     } catch (err) {
