@@ -163,7 +163,7 @@ export function useDots() {
           'Content-Type': 'application/json'
         }
       });
-
+        
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to delete dot');

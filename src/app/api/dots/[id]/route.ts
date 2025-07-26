@@ -92,19 +92,91 @@ export async function DELETE(
       );
     }
 
-    // Delete the dot (cascading delete will handle conversations, knowledge_chunks, etc.)
-    const { error: deleteError } = await supabase
+    // First, let's check what tables reference this dot
+    console.log('Checking foreign key references for dot:', id);
+    
+    // Check conversations table
+    const { data: conversations, error: convError } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('dot_id', id);
+    
+    if (convError) {
+      console.error('Error checking conversations:', convError);
+    } else {
+      console.log('Found conversations:', conversations?.length || 0);
+    }
+    
+    // Check knowledge_chunks table
+    const { data: chunks, error: chunksError } = await supabase
+      .from('knowledge_chunks')
+      .select('id')
+      .eq('dot_id', id);
+    
+    if (chunksError) {
+      console.error('Error checking knowledge_chunks:', chunksError);
+    } else {
+      console.log('Found knowledge chunks:', chunks?.length || 0);
+    }
+    
+    // Check scraping_sessions table
+    const { data: sessions, error: sessionsError } = await supabase
+      .from('scraping_sessions')
+      .select('id')
+      .eq('dot_id', id);
+    
+    if (sessionsError) {
+      console.error('Error checking scraping_sessions:', sessionsError);
+    } else {
+      console.log('Found scraping sessions:', sessions?.length || 0);
+    }
+
+    // Try to delete the dot (cascading delete should handle related records)
+    let { error: deleteError } = await supabase
       .from('dots')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);
 
+    // If cascade delete fails, manually delete related records first
     if (deleteError) {
-      console.error('Error deleting dot:', deleteError);
-      return NextResponse.json(
-        { error: 'Failed to delete dot' },
-        { status: 500 }
-      );
+      console.error('Cascade delete failed, trying manual cleanup:', deleteError);
+      
+      // Manually delete related records in the correct order
+      const tablesToClean = [
+        { table: 'conversations', field: 'dot_id' },
+        { table: 'knowledge_chunks', field: 'dot_id' },
+        { table: 'scraping_sessions', field: 'dot_id' }
+      ];
+      
+      for (const { table, field } of tablesToClean) {
+        const { error: cleanupError } = await supabase
+          .from(table)
+          .delete()
+          .eq(field, id);
+        
+        if (cleanupError) {
+          console.error(`Error cleaning up ${table}:`, cleanupError);
+        } else {
+          console.log(`Successfully cleaned up ${table}`);
+        }
+      }
+      
+      // Now try to delete the dot again
+      const { error: retryError } = await supabase
+        .from('dots')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (retryError) {
+        console.error('Error deleting dot after cleanup:', retryError);
+        console.error('Error details:', JSON.stringify(retryError, null, 2));
+        return NextResponse.json(
+          { error: 'Failed to delete dot', details: retryError },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ success: true });
